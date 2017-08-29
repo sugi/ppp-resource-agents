@@ -1,0 +1,308 @@
+#!/bin/sh
+#
+#   OCF resource agent for PPP connection
+#
+#   License:      GNU General Public License version 2 (GPL2)
+#   (c) 2017 Tatsuki Sugiura <sugi@nemui.org and OSDN Corporation <tech@osdn.jp>,
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+
+# Init
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+. ${OCF_FUNCTIONS_DIR}/findif.sh
+
+# Defaults
+OCF_RESKEY_expected_ip4_default=""
+OCF_RESKEY_expected_ip6_default=""
+OCF_RESKEY_isp_default="provider"
+OCF_RESKEY_pon_retries_default="30"
+OCF_RESKEY_pon_wait_sec_default="5"
+OCF_RESKEY_poff_wait_sec_default="3"
+OCF_RESKEY_ip_wait_sec_default="30"
+
+: ${OCF_RESKEY_expected_ip4=${OCF_RESKEY_expected_ip4_default}}
+: ${OCF_RESKEY_expected_ip6=${OCF_RESKEY_expected_ip6_default}}
+: ${OCF_RESKEY_isp=${OCF_RESKEY_isp_default}}
+: ${OCF_RESKEY_pon_retries=${OCF_RESKEY_pon_retries_default}}
+: ${OCF_RESKEY_pon_wait_sec=${OCF_RESKEY_pon_wait_sec_default}}
+: ${OCF_RESKEY_poff_wait_sec=${OCF_RESKEY_poff_wait_sec_default}}
+: ${OCF_RESKEY_ip_wait_sec=${OCF_RESKEY_ip_wait_sec_default}}
+
+meta_data() {
+	cat <<EOM
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="PPPConnection" version="0.1">
+  <version>0.1</version>
+  <longdesc lang="en">
+Handle ppp connection as OCF resource. This resource calls pon/poff to connect ppp.
+  </longdesc>
+  <shortdesc lang="en">
+Handle ppp connection as OCF resource. This resource calls pon/poff to connect ppp.
+  </shortdesc>
+  <parameters>
+    <parameter name="expected_ip4" unique="1" required="0">
+      <longdesc lang="en">
+      Expected IPv4 address. If you specify this parameter,
+      startup and monitor proecesses will wait the address associated with ppp interface.
+      </longdesc>
+      <shortdesc lang="en">Expected IPv4 address</shortdesc>
+      <content type="string" default="" />
+    </parameter>
+    <parameter name="expected_ip6" unique="1" required="0">
+      <longdesc lang="en">
+      Expected IPv6 address. If you specify this parameter,
+      startup and monitor proecesses will wait the address associated with ppp interface.
+      </longdesc>
+      <shortdesc lang="en">Expected IPv6 address</shortdesc>
+      <content type="string" default="" />
+    </parameter>
+    <parameter name="isp" unique="1" required="0">
+      <longdesc lang="en">
+      ISP name. This will be passed to pon/poff, and pppd will be monitored with specified isp.
+      Default is "provider".
+      </longdesc>
+      <shortdesc lang="en">ISP name (default: provider)</shortdesc>
+      <content type="string" default="provider" />
+    </parameter>
+    <parameter name="pon_retries" unique="0" required="0">
+      <longdesc lang="en">
+      Retry limit for pon
+      </longdesc>
+      <shortdesc lang="en">Retry limit for pon</shortdesc>
+      <content type="integer" default="30" />
+    </parameter>
+    <parameter name="pon_wait_sec" unique="0" required="0">
+      <longdesc lang="en">
+      Resource will wait specified seconds for ppp connection up. When it's exceeded, retry to run pon.
+      </longdesc>
+      <shortdesc lang="en">Wait time for pon on each tries</shortdesc>
+      <content type="integer" default="5" />
+    </parameter>
+    <parameter name="poff_wait_sec" unique="0" required="0">
+      <longdesc lang="en">
+      Resource will wait specified seconds for ppp connection down. When it's exceeded, retry to run poff.
+      </longdesc>
+      <shortdesc lang="en">Wait time for poff on each tries</shortdesc>
+      <content type="integer" default="3" />
+    </parameter>
+    <parameter name="ip_wait_sec" unique="0" required="0">
+      <longdesc lang="en">
+      Resource will wait specified seconds for ppp interface aquires expected IP address provided by expected_ip4 or expected_ip6.
+      </longdesc>
+      <shortdesc lang="en">Wait time for expected ip</shortdesc>
+      <content type="integer" default="3" />
+    </parameter>
+  </parameters>
+  <actions>
+    <action name="start"        timeout="60s" />
+    <action name="stop"         timeout="60s" />
+    <action name="monitor"      timeout="10s" interval="30s" depth="0" />
+    <action name="meta-data"    timeout="5s" />
+    <action name="validate-all" timeout="10s" />
+  </actions>
+</resource-agent>
+EOM
+
+  exit $OCF_SUCCESS
+}
+
+ppp_usage() {
+        cat <<END
+usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+
+Expects to have a fully populated OCF RA-compliant environment set.
+END
+}
+
+ppp_validate() {
+  ppp_init
+  check_binary ps
+  check_binary $AWK
+  check_binary $EGREP
+  check_binary grep
+  check_binary pon
+  check_binary poff
+
+
+  if [ ! -z "$IP4" -o ! -z "$IP6" ]; then
+    check_binary $IP2UTIL
+  fi
+
+  if [ -z "$ISP" ]; then
+    ocf_log err "Isp name is not specified for PPPConnection"
+    exit $OCF_ERR_CONFIGURED
+  fi
+}
+
+ppp_init() {
+  ISP="$OCF_RESKEY_isp"
+  IP4="$OCF_RESKEY_expected_ip4"
+  IP6="$OCF_RESKEY_expected_ip6"
+}
+
+ppp_start() {
+  ppp_init
+  tries=0
+  while ! ppp_check_pppd; do
+    tries=`expr $tries + 1`
+    ocf_run pon $ISP
+    if [ "$tries" -gt "$OCF_RESKEY_pon_retries" ]; then
+      ocf_log err "Retry limit for pon is exceeded. Giving up!"
+      return $OCF_ERR_GENERIC
+    fi
+    if [ "$tries" -eq 1 ]; then
+      sleep 1
+    else
+      sleep $OCF_RESKEY_pon_wait_sec
+    fi
+  done
+  tries=0
+  while ! ppp_check_ip; do
+    tries=`expr $tries + 1`
+    sleep 1
+    if [ "$tries" -gt "$OCF_RESKEY_ip_wait_sec" ]; then
+      ocf_log err "Timeout to aquire expected IP address ${IP4} ${IP6}."
+      return $OCF_ERR_GENERIC
+    fi
+  done
+  return $OCF_SUCCESS
+}
+
+ppp_stop() {
+  ppp_init
+  tries=0
+  while ppp_check_pppd; do
+    tries=`expr $tries + 1`
+    ocf_run poff ${ISP}
+    if [ "$tries" -eq 1 ]; then
+      sleep 1
+      continue
+    elif [ "$tries" -gt 10 ]; then
+      ocf_log err "ppp connection is still active with isp '${ISP}', giving up to stop!"
+      return $OCF_ERR_GENERIC
+    elif [ "$tries" -gt 8 ]; then
+      ocf_log warn "pppd is still running with isp '${ISP}'. Trying to send KILL signal..."
+      kill -KILL `ps -ewwwo pid,args | $EGREP "[p]ppd call ${ISP}\$" | $AWK '{print $1}'`
+    elif [ "$tries" -gt 5 ]; then
+      ocf_log warn "pppd is still running with isp '${ISP}'. Trying to send TERM signal..."
+      kill -TERM `ps -ewwwo pid,args | $EGREP "[p]ppd call ${ISP}\$" | $AWK '{print $1}'`
+    fi
+    sleep $OCF_RESKEY_poff_wait_sec
+  done
+  return $OCF_SUCCESS
+}
+
+ppp_check_pppd() {
+  ppp_init
+  ps -ewwo args | $EGREP -q "[p]ppd call ${ISP}\$" || return 1
+  return 0
+}
+
+ppp_check_ip() {
+  ppp_init
+  if [ ! -z "$IP4" ]; then
+    $IP2UTIL -4 a list type ppp | grep "inet $IP4 "
+    $IP2UTIL -4 a list type ppp | grep -q "inet $IP4 " || return 1
+  fi
+  if [ ! -z "$IP6" ]; then
+    $IP2UTIL -6 a list type ppp | grep "inet6 $IP6 "
+    $IP2UTIL -6 a list type ppp | grep -q "inet6 $IP6 " || return 1
+  fi
+  return 0
+}
+
+ppp_echo_status() {
+  if ! ppp_check_pppd; then
+    echo "disconnected"
+    return 0
+  fi
+  if ! ppp_check_ip; then
+    echo "connecting"
+    return 0
+  fi
+  echo "connected"
+  return 0
+}
+
+ppp_monitor() {
+  ppp_init
+  local status=`ppp_echo_status`
+  case $status in
+    connected)
+      return $OCF_SUCCESS
+      ;;
+    connecting)
+      return $OCF_ERR_GENERIC
+      ;;
+    disconnected)
+      return $OCF_NOT_RUNNING
+      ;;
+    *)
+      return $OCF_ERR_GENERIC
+      ;;
+  esac
+}
+
+
+case $__OCF_ACTION in
+  meta-data)
+    meta_data
+    ;;
+  usage|help)
+    ppp_usage
+    exit $OCF_SUCCESS
+    ;;
+esac
+
+ppp_validate
+
+case $__OCF_ACTION in
+  start)
+    ppp_start
+    ;;
+  stop)
+    ppp_stop
+    ;;
+  status)
+    ip_status=`ppp_echo_status`
+    if [ $ip_status = "connected" ]; then
+      echo "running"
+      exit $OCF_SUCCESS
+    else
+      echo "stopped"
+      exit $OCF_NOT_RUNNING
+    fi
+    ;;
+  monitor)
+    ppp_monitor
+    exit $?
+    ;;
+  validate-all)
+    ;;
+  *)
+    ppp_usage
+    exit $OCF_ERR_UNIMPLEMENTED
+    ;;
+esac
+
+# vim: ft=sh sw=2
