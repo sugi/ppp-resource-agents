@@ -1,0 +1,15 @@
+Source: ppp-resource-agents
+Section: admin
+Priority: optional
+Maintainer: Tatsuki Sugiura <sugi@nemui.org>
+Build-Depends: debhelper (>= 9)
+Standards-Version: 3.9.8
+Homepage: https://osdn.net/projects/osdn-codes/ppp-resource-agents
+#Vcs-Git: https://anonscm.debian.org/collab-maint/ppp-resource-agents.git
+#Vcs-Browser: https://anonscm.debian.org/cgit/collab-maint/ppp-resource-agents.git
+
+Package: ppp-resource-agents
+Architecture: all
+Depends: resource-agents
+Description: OCF resource agent for PPP connection
+ Agent to handle PPP connections as OCF resource.

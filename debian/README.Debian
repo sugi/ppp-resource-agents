@@ -1,0 +1,6 @@
+ppp-resource-agents for Debian
+-----------------------------
+
+Debian package of ppp-resource-agents which provide OCF resource agent of PPP connection.
+
+ -- Tatsuki Sugiura <sugi@nemui.org>  Tue, 29 Aug 2017 19:20:25 +0900
