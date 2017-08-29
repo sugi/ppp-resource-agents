@@ -201,10 +201,10 @@ ppp_stop() {
       ocf_log err "ppp connection is still active with isp '${ISP}', giving up to stop!"
       return $OCF_ERR_GENERIC
     elif [ "$tries" -gt 8 ]; then
-      ocf_log warn "pppd is still running with isp '${ISP}'. Trying to send KILL signal..."
+      ocf_log warn "pppd still running with isp '${ISP}'. Trying to send KILL signal..."
       kill -KILL `ps -ewwwo pid,args | $EGREP "[p]ppd call ${ISP}\$" | $AWK '{print $1}'`
     elif [ "$tries" -gt 5 ]; then
-      ocf_log warn "pppd is still running with isp '${ISP}'. Trying to send TERM signal..."
+      ocf_log warn "pppd still running with isp '${ISP}'. Trying to send TERM signal..."
       kill -TERM `ps -ewwwo pid,args | $EGREP "[p]ppd call ${ISP}\$" | $AWK '{print $1}'`
     fi
     sleep $OCF_RESKEY_poff_wait_sec
@@ -279,9 +279,11 @@ ppp_validate
 case $__OCF_ACTION in
   start)
     ppp_start
+    exit $?
     ;;
   stop)
     ppp_stop
+    exit $?
     ;;
   status)
     ip_status=`ppp_echo_status`
@@ -298,6 +300,7 @@ case $__OCF_ACTION in
     exit $?
     ;;
   validate-all)
+    exit $OCF_SUCCESS
     ;;
   *)
     ppp_usage
