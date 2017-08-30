@@ -221,11 +221,9 @@ ppp_check_pppd() {
 ppp_check_ip() {
   ppp_init
   if [ ! -z "$IP4" ]; then
-    $IP2UTIL -4 a list type ppp | grep "inet $IP4 "
     $IP2UTIL -4 a list type ppp | grep -q "inet $IP4 " || return 1
   fi
   if [ ! -z "$IP6" ]; then
-    $IP2UTIL -6 a list type ppp | grep "inet6 $IP6 "
     $IP2UTIL -6 a list type ppp | grep -q "inet6 $IP6 " || return 1
   fi
   return 0
@@ -246,7 +244,7 @@ ppp_echo_status() {
 
 ppp_monitor() {
   ppp_init
-  local status=`ppp_echo_status`
+  status=`ppp_echo_status`
   case $status in
     connected)
       return $OCF_SUCCESS
