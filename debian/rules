@@ -23,3 +23,8 @@
 #override_dh_auto_configure:
 #	dh_auto_configure -- #	-DCMAKE_LIBRARY_PATH=$(DEB_HOST_MULTIARCH)
 
+DESTDIR=$(CURDIR)/debian/ppp-resource-agents
+
+override_dh_install:
+	mkdir -p $(DESTDIR)/usr/lib/ocf/resource.d/ppp
+	install -m 755 PPPConnection $(DESTDIR)/usr/lib/ocf/resource.d/ppp/
