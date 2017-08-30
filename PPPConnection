@@ -3,7 +3,7 @@
 #   OCF resource agent for PPP connection
 #
 #   License:      GNU General Public License version 2 (GPL2)
-#   (c) 2017 Tatsuki Sugiura <sugi@nemui.org and OSDN Corporation <tech@osdn.jp>,
+#   (c) 2017 Tatsuki Sugiura <sugi@nemui.org> and OSDN Corporation <tech@osdn.jp>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of version 2 of the GNU General Public License as
@@ -110,7 +110,7 @@ Handle ppp connection as OCF resource. This resource calls pon/poff to connect p
       Resource will wait specified seconds for ppp interface aquires expected IP address provided by expected_ip4 or expected_ip6.
       </longdesc>
       <shortdesc lang="en">Wait time for expected ip</shortdesc>
-      <content type="integer" default="3" />
+      <content type="integer" default="30" />
     </parameter>
   </parameters>
   <actions>
