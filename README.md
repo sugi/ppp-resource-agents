@@ -7,8 +7,8 @@ Here is an example that connect `dsl-provider`
 ```
 primitive ppp-myisp PPPConnection \
         params isp=dsl-provider \
-        op monitor interval=30 timeout=10 \
-        op start timeout=60 interval=0 \
+        op monitor interval=30 timeout=10 on-fail=restart \
+        op start timeout=60 interval=0 on-fail=restart \
         op stop timeout=60 interval=0
 ```
 
