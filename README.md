@@ -9,7 +9,8 @@ primitive ppp-myisp PPPConnection \
         params isp=dsl-provider \
         op monitor interval=30 timeout=10 on-fail=restart \
         op start timeout=60 interval=0 on-fail=restart \
-        op stop timeout=60 interval=0
+        op stop timeout=60 interval=0 \
+	meta failure-timeout=300
 ```
 
 ## Option parameters
