@@ -1,3 +1,10 @@
+ppp-resource-agents (0.2.0-1) unstable; urgency=medium
+
+  * Upstream release
+  * Stop checking IP address on start to avoid fatal error.
+
+ -- Tatsuki Sugiura <sugi@nemui.org>  Tue, 02 Jul 2019 14:45:17 +0900
+
 ppp-resource-agents (0.1.1-1) unstable; urgency=medium
 
   * Fix compatibility issue when expected_ip* parameter is specified.
